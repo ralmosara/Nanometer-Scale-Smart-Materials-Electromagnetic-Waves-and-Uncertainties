@@ -1,14 +1,10 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_marshmallow import Marshmallow
 import redis
 
 from config import Config
-
-db = SQLAlchemy()
-ma = Marshmallow()
-cache = None
+from extensions import db, ma
+import extensions
 
 
 def create_app():
@@ -19,8 +15,7 @@ def create_app():
     db.init_app(app)
     ma.init_app(app)
 
-    global cache
-    cache = redis.from_url(app.config['REDIS_URL'])
+    extensions.cache = redis.from_url(app.config['REDIS_URL'])
 
     from routes import chapter1, chapter2, chapter3, chapter4, common
     app.register_blueprint(chapter1.bp)

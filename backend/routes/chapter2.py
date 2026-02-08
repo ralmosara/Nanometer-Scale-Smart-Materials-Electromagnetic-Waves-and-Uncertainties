@@ -1,4 +1,7 @@
+import json
+import hashlib
 from flask import Blueprint, request, jsonify
+from extensions import cache
 from services.statistical import (
     monte_carlo_rod_mesh,
     polynomial_chaos_rod_mesh,
@@ -8,6 +11,13 @@ from services.statistical import (
 )
 
 bp = Blueprint('chapter2', __name__, url_prefix='/api/ch2')
+
+CACHE_TTL = 900  # 15 minutes
+
+
+def _cache_key(prefix, params):
+    raw = json.dumps(params, sort_keys=True)
+    return f"sim:{prefix}:{hashlib.md5(raw.encode()).hexdigest()}"
 
 
 @bp.route('/monte-carlo', methods=['POST'])
@@ -42,7 +52,22 @@ def polynomial_chaos():
     freq_max = data.get('freq_max', 200)
     order = data.get('order', 2)
 
+    params = {'E0': E0, 'sigma_E': sigma_E, 'damping': damping, 'num_freq': num_freq, 'freq_max': freq_max, 'order': order}
+    key = _cache_key('pc', params)
+    try:
+        cached = cache.get(key)
+        if cached:
+            return jsonify(json.loads(cached))
+    except Exception:
+        pass
+
     result = polynomial_chaos_rod_mesh(E0, sigma_E, damping, num_freq, 0, freq_max, order)
+
+    try:
+        cache.setex(key, CACHE_TTL, json.dumps(result))
+    except Exception:
+        pass
+
     return jsonify(result)
 
 
